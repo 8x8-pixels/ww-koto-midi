@@ -1,0 +1,12 @@
+{
+  "pulse_ms": 20,
+  "start_delay_ms": 3000,
+  "unmapped_note": "error",
+  "require_target_window": true,
+  "target_window_title": "鳴潮",
+  "keymap": {
+    "48": "Z", "50": "X", "52": "C", "53": "V", "55": "B", "57": "N", "59": "M",
+    "60": "A", "62": "S", "64": "D", "65": "F", "67": "G", "69": "H", "71": "J",
+    "72": "Q", "74": "W", "76": "E", "77": "R", "79": "T", "81": "Y", "83": "U"
+  }
+}
