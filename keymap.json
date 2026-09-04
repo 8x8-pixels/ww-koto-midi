@@ -1,7 +1,7 @@
 {
   "pulse_ms": 20,
   "start_delay_ms": 3000,
-  "unmapped_note": "error",
+  "unmapped_note": "quantize",
   "require_target_window": true,
   "target_window_title": "鳴潮",
   "keymap": {

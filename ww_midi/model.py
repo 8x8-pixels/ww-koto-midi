@@ -51,11 +51,13 @@ def load_config(path: str | Path) -> Config:
     )
 
 
-def analyze(song: MidiSong, config: Config) -> Analysis:
-    tempo_events = sorted(song.tempos, key=lambda event: event.tick)
+def analyze(song: MidiSong, config: Config, fixed_bpm: float | None = None) -> Analysis:
+    if fixed_bpm is not None and not 1 <= fixed_bpm <= 999:
+        raise ValueError("BPM must be between 1 and 999")
+    tempo_events = [] if fixed_bpm is not None else sorted(song.tempos, key=lambda event: event.tick)
     current_tick = 0
     current_us = 0
-    tempo = 500_000
+    tempo = round(60_000_000 / fixed_bpm) if fixed_bpm is not None else 500_000
     tempo_index = 0
     groups: list[PlayGroup] = []
     unmapped: Counter[int] = Counter()

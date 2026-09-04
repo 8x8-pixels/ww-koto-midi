@@ -51,17 +51,48 @@ class App:
         ttk.Label(frame, textvariable=self.unmapped_var, foreground="#a22", justify="left").grid(
             row=3, column=0, columnspan=2, sticky="nw", pady=(10, 0)
         )
-        frame.rowconfigure(4, weight=1)
+        tempo_controls = ttk.Frame(frame)
+        tempo_controls.grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        self.use_midi_tempo_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            tempo_controls,
+            text="Use MIDI tempo events",
+            variable=self.use_midi_tempo_var,
+            command=self._tempo_changed,
+        ).pack(side="left")
+        ttk.Label(tempo_controls, text="BPM:").pack(side="left", padx=(18, 5))
+        self.bpm_var = tk.StringVar(value="120")
+        self.bpm_entry = ttk.Entry(tempo_controls, textvariable=self.bpm_var, width=7)
+        self.bpm_entry.pack(side="left")
+        self.bpm_entry.bind("<Return>", self._tempo_changed)
+        self.bpm_entry.bind("<FocusOut>", self._tempo_changed)
+        self.tempo_mode_var = tk.StringVar()
+        ttk.Label(tempo_controls, textvariable=self.tempo_mode_var).pack(side="left", padx=(10, 0))
+        frame.rowconfigure(5, weight=1)
         controls = ttk.Frame(frame)
-        controls.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        controls.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(12, 0))
         self.play_button = ttk.Button(controls, text="Play (F6)", command=self.play, state="disabled")
         self.play_button.pack(side="left")
         ttk.Button(controls, text="Stop (F7 / Esc)", command=self.stop).pack(side="left", padx=8)
         ttk.Button(controls, text="Reload config", command=self.reload_config).pack(side="left")
         self.status_var = tk.StringVar(value="Ready")
         ttk.Label(frame, textvariable=self.status_var, relief="sunken", padding=6).grid(
-            row=6, column=0, columnspan=2, sticky="ew", pady=(14, 0)
+            row=7, column=0, columnspan=2, sticky="ew", pady=(14, 0)
         )
+
+    def _tempo_changed(self, _event: tk.Event | None = None) -> None:
+        self._reanalyze()
+
+    def _fixed_bpm(self) -> float | None:
+        if self.song is not None and self.use_midi_tempo_var.get() and self.song.tempos:
+            return None
+        try:
+            bpm = float(self.bpm_var.get())
+        except ValueError as exc:
+            raise ValueError("BPM must be a number between 1 and 999") from exc
+        if not 1 <= bpm <= 999:
+            raise ValueError("BPM must be between 1 and 999")
+        return bpm
 
     def reload_config(self) -> None:
         try:
@@ -91,8 +122,22 @@ class App:
     def _reanalyze(self) -> None:
         if self.song is None or self.config is None:
             return
-        self.analysis = analyze(self.song, self.config)
+        try:
+            fixed_bpm = self._fixed_bpm()
+            self.analysis = analyze(self.song, self.config, fixed_bpm=fixed_bpm)
+        except ValueError as exc:
+            self.analysis = None
+            self.play_button.configure(state="disabled")
+            self.tempo_mode_var.set(str(exc))
+            self.status_var.set("Validation failed")
+            return
         a = self.analysis
+        if fixed_bpm is None:
+            self.tempo_mode_var.set("Using MIDI tempo")
+        elif self.song.tempos:
+            self.tempo_mode_var.set(f"Fixed at {fixed_bpm:g} BPM")
+        else:
+            self.tempo_mode_var.set(f"No tempo events; using {fixed_bpm:g} BPM")
         self.info_var.set(
             f"SMF Type: {self.song.format}\nPPQ: {self.song.ppq}\nDuration: {a.duration_us / 1_000_000:.3f} sec\n"
             f"Note On events: {a.note_count}\nMax polyphony: {a.max_polyphony}\nTempo events: {len(self.song.tempos)}"
@@ -108,6 +153,7 @@ class App:
         self.status_var.set("Validation failed" if blocked else "Validated")
 
     def play(self) -> None:
+        self._reanalyze()
         if self.analysis is None or self.config is None:
             return
         try:

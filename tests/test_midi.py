@@ -58,6 +58,22 @@ class MidiTests(unittest.TestCase):
         self.assertEqual([note.note for note in song.notes], [60, 64])
         self.assertEqual([group.time_us for group in result.groups], [0, 500_000])
 
+    def test_fixed_bpm_ignores_tempo_events(self) -> None:
+        track = (
+            b"\x00\xFF\x51\x03\x0F\x42\x40"  # 60 BPM in the file
+            b"\x00\x90\x3C\x64"
+            + vlq(480) + b"\x40\x64"
+            + b"\x00\xFF\x2F\x00"
+        )
+        song = load_midi(self.write_midi(midi_file([track], format_type=0)))
+        result = analyze(song, load_config(self.config_path), fixed_bpm=120)
+        self.assertEqual([group.time_us for group in result.groups], [0, 500_000])
+
+    def test_fixed_bpm_is_validated(self) -> None:
+        song = load_midi(self.write_midi(midi_file([b"\x00\xFF\x2F\x00"], format_type=0)))
+        with self.assertRaisesRegex(ValueError, "BPM"):
+            analyze(song, load_config(self.config_path), fixed_bpm=0)
+
     def test_type_one_tracks_are_merged_and_chords_grouped(self) -> None:
         tempo_track = b"\x00\xFF\x51\x03\x0F\x42\x40\x00\xFF\x2F\x00"
         notes_a = b"\x00\x90\x3C\x40\x00\x90\x40\x40\x00\xFF\x2F\x00"
